@@ -2,7 +2,9 @@
 #include <WiFi.h>
 #include <NTPClient.h>
 #include <WiFiUdp.h>
-
+#include <FS.h>
+#include <SPIFFS.h>
+#define FORMAT_SPIFFS_IF_FAILED true
 #define MULTI_LINE_STRING(...) #__VA_ARGS__
 // Replace with your network credentials
 const char* ssid = "Kompsci LAN";
@@ -28,7 +30,7 @@ unsigned long previousTime = 0;
 // Define timeout time in milliseconds (example: 2000ms = 2s)
 const long timeoutTime = 2000;
 
-String wakeupTime = "6:15";
+String wakeupTime = "06:31";
 // int soundPin = 12;
 // int snoozePin = 26;
 
@@ -50,7 +52,17 @@ void beep(int times) {
     delay(delayBetweenBeeps);
   }
 }
- 
+ // get wakeup time from SPIFFS
+String getWakeupTime() {
+  File file = SPIFFS.open("/wakeupTime.txt", "r");
+  if (!file) {
+    Serial.println("There was an error opening the file for reading");
+    return "06:15";
+  }
+  String time = file.readStringUntil('\n');
+  file.close();
+  return time;
+}
 
 void setup() {
   // put your setup code here, to run once:
@@ -80,8 +92,13 @@ void setup() {
   // GMT +8 = 28800
   // GMT -1 = -3600
   // GMT 0 = 0
+  if(!SPIFFS.begin(true)){
+    Serial.println("An Error has occurred while mounting SPIFFS");
+    return;
+  }
   timeClient.setTimeOffset(-3600*4);
   Serial.println("Ready to play!");
+  wakeupTime = getWakeupTime();
 
 }
 String getDefaultPage() {
@@ -147,7 +164,7 @@ bool IsLocked() {
 
   int currentHour = getHours();
   // int currentMinute = getMinutes();
-  return !(currentHour >= 10 && currentHour < 22.5);
+  return !(currentHour >= 10 && currentHour < 23.9 || currentHour < 4);
 
 }
 String getQueryStringFromURL(String url, String query) {
@@ -160,6 +177,18 @@ String getQueryStringFromURL(String url, String query) {
     return url.substring(startIndex + query.length() + 1, endIndex);
   }
   return "";
+}
+
+
+// use SPIFFS to save the wakeup time
+void saveWakeupTime(String time) {
+  File file = SPIFFS.open("/wakeupTime.txt", "w");
+  if (!file) {
+    Serial.println("There was an error opening the file for writing");
+    return;
+  }
+  file.println(time);
+  file.close();
 }
 void doWifiStuff() { 
   WiFiClient client = server.available();   // Listen for incoming clients
@@ -193,9 +222,11 @@ void doWifiStuff() {
               } else if (!IsLocked()) {
                  Serial.println(time);
                 wakeupTime = time;
+                saveWakeupTime(time);
               } else if (isAuthorizedRequest(header)) {
                 Serial.println(time);
                 wakeupTime = time;
+                saveWakeupTime(time);
               }
              
             }
@@ -267,11 +298,11 @@ void checkBeeping() {
       if (firstten) {
           Serial.println("Doing first beep!");
           firstten = false;
-          beep(200);
-          nextBeep = millis() + (1000 * 60 * 10);;
+          beep(300);
+          nextBeep = millis() + (1000 * 60 * 20);;
         } else {
           beep(50);
-          nextBeep = millis() + (1000 * 20);
+          nextBeep = millis() + (1000 * 5);
         } 
     }
     }
@@ -284,6 +315,7 @@ void checkBeeping() {
 
 }
 int lastMinute = -34;
+unsigned long disconnectTime = 0;
   void loop() {
   // put your main code here, to run repeatedly:
   
@@ -303,6 +335,18 @@ int lastMinute = -34;
     checkBeeping();
   }
   // delay(500);
+  // if wifi is not connected, wait an hour, if its still not connected, restart esp. do not execution by using delay()
+  if (!WiFi.isConnected()) {
+    disconnectTime = millis();
+  }
+  if (millis() - disconnectTime > 1000 * 60 * 60) {
+    if (!WiFi.isConnected()) {
+     ESP.restart();
+    }
+  }
+
+
+
 }
 
 
