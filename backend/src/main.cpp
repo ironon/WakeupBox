@@ -138,9 +138,16 @@ bool isAuthorizedRequest(String header) {
   }
   return false;
 }
+int lastHour = -1;
 int getHours() {
   // formattedDate = timeClient.getHours();
-  return timeClient.getHours();
+  int newHour = timeClient.getHours();
+  if (newHour - lastHour > 1) { //sometimes timeclient is wrong, so if the time is more than an hour off, just return the last hour
+    return lastHour;
+  }
+
+  lastHour =newHour;
+  return lastHour;
 }
 int getMinutes() {
   return timeClient.getMinutes();
@@ -332,7 +339,9 @@ unsigned long disconnectTime = 0;
       // snooze = true;
       // Serial.println("Snoozing!");
     // }
-    checkBeeping();
+    if (millis() > startupTime) { //if it's been 10 minutes since startup, start beeping
+      checkBeeping();
+    }
   }
   // delay(500);
   // if wifi is not connected, wait an hour, if its still not connected, restart esp. do not execution by using delay()
