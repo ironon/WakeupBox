@@ -1,0 +1,29 @@
+{
+	"folders": [
+		{
+			"path": "../.."
+		},
+		{
+			"name": "backend",
+			"path": ".."
+		},
+		{
+			"path": "../../frontend"
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"any": "cpp",
+			"array": "cpp",
+			"chrono": "cpp",
+			"functional": "cpp",
+			"istream": "cpp",
+			"ostream": "cpp",
+			"ratio": "cpp",
+			"tuple": "cpp",
+			"type_traits": "cpp",
+			"utility": "cpp",
+			"variant": "cpp"
+		}
+	}
+}

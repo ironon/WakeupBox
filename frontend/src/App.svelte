@@ -6,9 +6,10 @@
   let hexKey = "7cb5d18ae409a37c10d3fdf3b68408ea3503d0335796bf949914e400ae2cc27d48ffa59034c01d033a6a854847561c5f2a1f19567e4f569635862d2550a6a1a50de09a20ee3b6b3946157353d568b3ee"
   let currentTime = new Date().toLocaleTimeString();
   let lockedIn = "0"
-
+  let secret = localStorage.getItem("secret") || ""
   let beepLength = 1000
   let beepCount = 10
+  let disabled = false
   let beepDelay = 1000
   const updateLocks = async () => {
     // send beepLength, beepCount, and beepDelay to server
@@ -24,13 +25,21 @@
 
   const setSavedTime = async (time) => {
     // send a request to /setTime with the time as the body
-    const response = await fetch(`/setTime?time=${time}&key=${hexKey}` + time, {
+    let key = hexKey
+    if (secret.length > 3) {
+      key = secret
+    }
+    const response = await fetch(`/setTime?time=${time}&key=${key}ENDMESSAGE`, {
       method: 'POST',
     
      
     });
   }
   getSavedTime().then((time) => {
+    if (time.includes("D")) { //clock is disabled if so
+      time = time.replace("D", "")
+      disabled = true
+    }
     alarmTime = time;
   });
   
@@ -40,6 +49,17 @@
     fetch(`/beep?key=${hexKey}`);
 
   };
+  const disable = () => {
+    //send a request to /beep
+    fetch(`/disable?key=${secret}ENDMESSAGE`);
+
+  };
+  const restart = () => {
+    fetch(`/restart?key=${hexKey}`)
+  }
+  const lock = () => {
+    fetch(`/setLocked?key=${hexKey}`)
+  }
   const getLockedState = () => {
     // if the time of day is between 9am and 6pm, return false
     const currentHour = new Date().getHours();
@@ -60,12 +80,11 @@
       const currentHour = new Date().getHours();
       const minutesTill6pm = (6 - currentHour) * 60;
       const minutesTill9am = (9 - currentHour) * 60;
-      lockedIn = Math.min(minutesTill6pm, minutesTill9am).toString();
-      //convert lockedIn to hours
-      lockedIn = (lockedIn / 60).toString();
+ 
       
     }
   }, 1000);
+  $: irrelevant = localStorage.setItem("secret", secret)
 </script>
 
 <style>
@@ -118,10 +137,19 @@
   <div class="alarm-clock">
  
     <h1>DAVID-ALARM 3000</h1>
+    {#if disabled} 
+      <h2>DISABLED</h2>
+    {/if}
     <p>Current Time: {currentTime}</p>
     <input type="time" bind:value={alarmTime} on:change={() => setSavedTime(alarmTime)} />
     <button on:click={testBeep}>Test Beep</button>
-    <button on:click={dampen}>Dampen</button>
+    <button on:click={lock}>Lock</button>
+    <button on:click={restart}>Restart</button>
+    {#if secret.length > 3}
+    <button style="background-color: #ffcc66; color: black" on:click={disable}>{disabled ? "Enable" : "Disable"}</button>
+    
+    {/if}
+    <input bind:value={secret} type="text" placeholder="Admin Key">
     {#if !locked}
     <div id="lockables">
       <!-- a numerical field for how long the alarm should beep, how many times it'll beep, the delay between each beep -->
@@ -130,7 +158,7 @@
       <input type="number" id="beep-delay" placeholder="Beep Delay (ms)" bind:value={beepDelay} on:change={() => updateLocks()}> -->
     </div>
     {:else}
-      <p>Alarm will be unlocked in {lockedIn} hours</p>
+     
     {/if}
   </div>
 </div>
