@@ -11,11 +11,11 @@
 #define FORMAT_SPIFFS_IF_FAILED true
 #define MULTI_LINE_STRING(...) #__VA_ARGS__
 // Replace with your network credentials
-// const char* ssid = "Kompsci LAN";
-// const char* password = "$nowOnTheBeach5";
+const char* ssid = "Kompsci LAN";
+const char* password = "$nowOnTheBeach5";
 
-const char* ssid = "Wiremore";
-const char* password = "antiwireless789!";
+// const char* ssid = "Wiremore";
+// const char* password = "antiwireless789!";
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, "pool.ntp.org");
 
@@ -42,16 +42,16 @@ const long timeoutTime = 2000;
 
 String wakeupTime = "06:31";
 int snoozePin = 26;
-int soundPin = 12;
+// int soundPin = 12;
 //for other board not screen (for moms house one i think)
-// int soundPin = 22;
+int soundPin = 22;
 
 int GMT_OFFSET = 5;
 int delayBetweenBeeps = 30;
 bool snooze = false;
 bool disabled = false;
 int snoozeTime = 1000 * 30;
-unsigned long startupTimeD = 1000 * 60 * 10;
+unsigned long startupTimeD = 1000 * 60 * 0;
 unsigned long initTime = millis();
 unsigned long startupTime = initTime + startupTimeD;
 int beepsRemaining = 0;
@@ -125,7 +125,8 @@ int hashFunction(String key) { //literal black magjic (acutally i kinda get it)
 }
 
 bool isAuthorizedRequest(String header) {
-  int startIndex = header.indexOf("key=") + 4;
+ 
+  int startIndex = 0;
   int endIndex = header.indexOf("ENDMESSAGE");
   Serial.println(header.substring(startIndex, endIndex));
   int hash = hashFunction(header.substring(startIndex, endIndex));
@@ -320,7 +321,7 @@ void saveWakeupTime(String time) {
 // }
 
 int lastBeep = 0;
-int nextBeep = 0;
+long nextBeep = 0;
 bool firstten = true;
 void checkBeeping() {
   // Serial.println("Checking beeping!");
@@ -332,17 +333,26 @@ void checkBeeping() {
   }
   if (getHours() == 1) {
     disabled = false;
+    firstten = true;
+
   }
   // Serial.println(currentTime-wakeupTime);
 
-  // the first beep waits 10 minutes, which is a 6th of an hour, so I'm subtracting it off so it doesn't affect how long this thing beeps for.
-  if (getShouldBeep()) {
+  Serial.println(nextBeep - millis());
+  if (nextBeep < millis() || nextBeep == 0) {
+     if (getShouldBeep() && !firstten) {
     Serial.println("I should be beeping!");
    
       beep(75);
       nextBeep = millis() + (1000 * 5);
 
-  } 
+  } else if (getShouldBeep() && firstten) {
+    firstten = false;
+    beep(150);
+    nextBeep = millis() + (1000 * 60);
+  }
+  }
+ 
 
 
 }
@@ -472,20 +482,14 @@ void setup() {
   });
    server.on("/setTime", HTTP_GET, [](AsyncWebServerRequest *request){
     // get query string from request
-    Serial.println("help me");
-  
+   
     String time = request->getParam("time")->value();
     Serial.println(time);
-    if (!IsLocked()) {
-      Serial.println(time);
-      wakeupTime = time;
-      saveWakeupTime(time);
-    } else if (isAuthorizedRequest(header)) {
+    if (!IsLocked() || isAuthorizedRequest(request->getParam("key")->value())) {
       Serial.println(time);
       wakeupTime = time;
       saveWakeupTime(time);
     }
-
     // convert time to char
     char timeChar[time.length() + 1];
     time.toCharArray(timeChar, time.length() + 1);
@@ -499,13 +503,13 @@ void setup() {
     request->send_P(200, "text/html", "ok", processor);
   });
   server.on("/disable", HTTP_GET, [](AsyncWebServerRequest *request){
-    if (isAuthorizedRequest(request->url())) {
+    if (isAuthorizedRequest(request->getParam("key")->value())) {
       disabled = true;
     }
     request->send_P(200, "text/html", "ok", processor);
   });
   server.on("/restart", HTTP_GET, [](AsyncWebServerRequest *request){
-    if (isAuthorizedRequest(request->url())) {
+    if (isAuthorizedRequest(request->getParam("key")->value())) {
       ESP.restart();
     }
     // request->send_P(200, "text/html", "ok", processor);
